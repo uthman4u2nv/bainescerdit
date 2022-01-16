@@ -5,7 +5,11 @@ const express=require("express");
 const Joi = require('joi'); 
 var app=express();
 app.use(express.json());
-app.listen(4444,()=>console.log('Server up and running'));
+const port = process.env.PORT || 8080;
+//app.listen(port,()=>console.log('Server up and running'));
+app.listen(port, () => {
+  console.log('Express server listening on port', port)
+});
 app.use(function (req, res, next) {
 
   // Website you wish to allow to connect
