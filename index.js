@@ -111,7 +111,7 @@ axios.post(url, data)
 })
 
 app.post('/OnlineApply',async(req,res)=>{
-
+const data2='';
 const data=
     {
         "FirstName": req.body.FirstName,
