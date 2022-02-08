@@ -122,7 +122,7 @@ const data=
         "Gender": req.body.Gender,
         "Address": req.body.Address,
         "PhoneNumber": req.body.PhoneNumber,
-        "ProductCode2": "100"
+        "ProductCode2": req.body.ProductCode2
       }
 const url='http://52.168.85.231/BankOneWebAPI/api/CustomerAndAccountCreation/CreateCustomerAndAccount/1?institutionCode=100605';
       axios.post(url, data)
