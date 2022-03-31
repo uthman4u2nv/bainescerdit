@@ -1,5 +1,6 @@
 const {Prohairesis}=require('prohairesis');
 const request=require('request');
+const https = require('https')
 const axios=require('axios');
 const bodyparser=require("body-parser");
 const express=require("express");
@@ -14,6 +15,7 @@ const port = process.env.PORT || 8080;
 //app.listen(port,()=>console.log('Server up and running'));
 
 const env=require('./connection');
+const utils = require('nodemon/lib/utils');
 const database=new Prohairesis(env.CLEARDB_DATABASE_URL);
 app.listen(port, () => {
   console.log('Express server listening on port', port)
@@ -35,6 +37,14 @@ app.use(function (req, res, next) {
 
   // Pass to next layer of middleware
   next();
+});
+app.use(function(req, res, next){
+  res.setTimeout(120000, function(){
+     console.log('Request has timed out.');
+        res.send(408);
+     });
+
+     next();
 });
 
 app.get('/',(req,res)=>{
@@ -169,6 +179,145 @@ conn.query(query,[currentdatetime,req.body.AccountNumber,"5885",req.body.Amount,
         }
         res.send(resp)
       });
+})
+
+//load all customers cards
+app.get('/loadcards/:email',async(req,res)=>{
+  let email=req.params.email;
+  database.query(
+    `SELECT * FROM cards WHERE email='${email}' GROUP BY last4 ORDER BY cardCreated DESC`
+  ).then((result)=>{
+    console.log(res);
+    res.send(result);
+  }).catch((err)=>{
+    console.log("Error fetching records:"+err)
+  }).finally(()=>{
+    //database.close();
+  })
+})
+
+//verify transaction and store authorization code for monthly deductions
+app.get('/verifyPaystackTrans/:ref/:accountNo',async(req,ress)=>{
+  let ref=req.params.ref;
+  let acctNo=req.params.ref;
+  //const url='https://api.paystack.co/transaction/verify/'+ref;
+  var config = {
+    method: 'get',
+    url: 'https://api.paystack.co/transaction/verify/'+ref,
+    headers: { 
+      'Authorization': 'Bearer sk_test_5a79f201933c7347065f707728af9938f02f2ee6', 
+      'Cookie': 'sails.sid=s%3AcxA_eT_vMzhvdhm5sSi0rzRnFRxhYy0m.z%2BRL0NzURzfv6xkT4SoyFJTk0EFYRe8XzktIr%2FisFgI'
+    }
+  };
+  
+  axios(config)
+  .then(function (response) {
+    //console.log(JSON.stringify(response.data));
+    //res.send(JSON.stringify(response.data.data.authorization))      
+    //res.send(JSON.stringify(response.data.data))
+//insert into cards table
+let insertId=0;
+let currentdatetime=GetCurrentDateTime();
+let first_name=response.data.data.customer.first_name;
+let last_name=response.data.data.customer.last_name;
+let email=response.data.data.customer.email;
+let authorization_code=response.data.data.authorization.authorization_code;
+let bin=response.data.data.authorization.bin;
+let last4=response.data.data.authorization.last4;
+let exp_month=response.data.data.authorization.exp_month;
+let exp_year=response.data.data.authorization.exp_year;
+let card_type=response.data.data.authorization.card_type;
+let bank=response.data.data.authorization.bank;
+let signature=response.data.data.authorization.signature;
+let account_name=response.data.data.authorization.account_name;
+let country_code=response.data.data.authorization.country_code;
+
+database.query(
+  `INSERT INTO cards(loanAccountNo,cardCreated,last_name,first_name,email,authorization_code,bin,last4,exp_month,exp_year,card_type,bank,signature,account_name,country_code) VALUES('${acctNo}','${currentdatetime}','${last_name}','${first_name}','${email}','${authorization_code}','${bin}','${last4}','${exp_month}','${exp_year}','${card_type}','${bank}','${signature}','${account_name}','${country_code}')`
+).then((res)=>{
+  console.log(res);
+  insertId=res.insertId;
+  if(insertId > 0){
+    let resp={
+      responseCode:"00",
+      responseMessage:"Card Linked Successfully"
+    }
+    ress.send(JSON.stringify(resp));
+  }else{
+    let resp={
+      responseCode:"69",
+      responseMessage:"Error linking card"
+    }
+    ress.send(JSON.stringify(resp));
+  }
+}).catch((err)=>{
+  console.log("Error inserting:"+err)
+}).finally(()=>{
+  //database.close();
+})
+
+  })
+  .catch(function (error) {
+    console.log(error);
+  });    
+})
+//loan details
+app.get('/loandetails/:loanAccountNumber',async(req,res)=>{
+  AccountNo=req.params.loanAccountNumber;
+  const url='http://52.168.85.231/BankOneWebAPI/api/Loan/GetTotalPaymentsOnLoan/2?authtoken=60631a02-9cfe-40e1-949b-7b080d827955&loanAccountNumber='+AccountNo;
+  const data2='';
+  axios.get(url, data2)
+  .then((response) => {
+    if(response.data.IsSuccessful==true){
+      let resp={
+        LoanAccountNumber:response.data.Message.LoanAccountNumber,
+        LoanAmount:response.data.Message.LoanAmount,
+        TotalPaymentOnLoan:response.data.Message.TotalPaymentOnLoan,
+        PrincipalPaid:response.data.Message.PrincipalPaid,
+        InterestPaid:response.data.Message.InterestPaid,
+        TotalOutstandingPrincipal:response.data.Message.TotalOutstandingPrincipal,
+        PrincipalDueButUnpaid:response.data.Message.PrincipalDueButUnpaid,
+        InterestDueButUnpaid:response.data.Message.InterestDueButUnpaid,
+      }
+      res.send(JSON.stringify(resp));
+    }else{
+      let resp={
+        responseCode:"69",
+        responseCode:"No Loan schedule found for this account"
+      }
+      res.send
+    }
+
+  },(error)=>{
+    console.log(error)
+    res.status(500).send();
+  })
+  
+})
+
+
+//loan schedule
+app.get('/loanschedule/:loanAccountNumber',async(req,res)=>{
+  AccountNo=req.params.loanAccountNumber;
+  const url='http://52.168.85.231/BankOneWebAPI/api/Loan/GetLoanRepaymentSchedule/2?authtoken=60631a02-9cfe-40e1-949b-7b080d827955&loanAccountNumber='+AccountNo;
+  const data2='';
+  axios.get(url, data2)
+  .then((response) => {
+    if(response.data.Id !=""){
+      res.send(JSON.stringify(response.data));
+    }else{
+      let resp={
+        responseCode:"69",
+        responseCode:"No Loan schedule found for this account"
+      }
+      res.send
+    }
+
+  },(error)=>{
+    console.log(error)
+    res.status(500).send();
+  })
+  
 })
 
 app.post('/OpenFixedDepositAccount',async(req,res)=>{
