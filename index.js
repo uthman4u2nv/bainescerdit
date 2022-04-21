@@ -17,6 +17,12 @@ const port = process.env.PORT || 8080;
 const env=require('./connection');
 const utils = require('nodemon/lib/utils');
 const database=new Prohairesis(env.CLEARDB_DATABASE_URL);
+
+const cors = require('cors');
+app.use(cors({
+    origin: '*'
+}));
+
 app.listen(port, () => {
   console.log('Express server listening on port', port)
 });
