@@ -83,6 +83,8 @@ return year + "-" + month + "-" + date + " " + hours + ":" + minutes + ":" + sec
 //console.log(hours + ":" + minutes);
 }
 
+
+
 app.post('/TransHistory',async(req,res)=>{
   let accountNo=req.body.accountNo;
   database.query(
@@ -95,6 +97,44 @@ app.post('/TransHistory',async(req,res)=>{
   }).finally(()=>{
     //database.close();
   })
+})
+
+app.post('/BVNValidation',async(req,res)=>{
+  const url="https://staging.mybankone.com/thirdpartyapiservice/apiservice/Account/BVN/GetBVNDetails";
+  const data={
+    "token":app.get('Token'),
+    "BVN":req.body.BVN
+  }
+  console.log("Data:"+JSON.stringify(data));
+  axios.post(url, data)
+  .then((response) => {
+    if(response.data.ResponseMessage){
+      const resp={
+        "phoneNumber":response.data.bvnDetails.phoneNumber,
+        "FirstName":response.data.bvnDetails.FirstName,
+        "LastName":response.data.bvnDetails.LastName,
+        "OtherNames":response.data.bvnDetails.OtherNames,
+        "DOB":response.data.bvnDetails.DOB
+      }
+      res.send(resp);
+    }else{
+      const resp={
+        "phoneNumber":"",
+        "FirstName":"",
+        "LastName":"",
+        "OtherNames":"",
+        "DOB":""
+      }
+        res.send(resp);
+    }
+  },(error)=>{
+    let resp={
+      responseCode:"99",
+      responseMessage:error.message
+    }
+    res.send(resp)
+  });
+  
 })
 
 app.post('/FundAccount',async(req,res)=>{
