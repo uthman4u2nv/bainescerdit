@@ -341,6 +341,42 @@ app.get('/loandetails/:loanAccountNumber',async(req,res)=>{
   
 })
 
+//loan details by Customer ID
+app.get('/loandetailsbycustomerID/:CustomerID',async(req,res)=>{
+  CustomerID=req.params.CustomerID;
+  const url='https://staging.mybankone.com/BankOneWebAPI/api/Loan/GetLoansByCustomerId/2?authtoken=60631a02-9cfe-40e1-949b-7b080d827955&institutionCode=100605&CustomerId='+CustomerID;
+  //const url='http://52.168.85.231/BankOneWebAPI/api/Loan/GetTotalPaymentsOnLoan/2?authtoken=60631a02-9cfe-40e1-949b-7b080d827955&loanAccountNumber='+AccountNo;
+  const data2='';
+  axios.get(url, data2)
+  .then((response) => {
+    if(response.data.IsSuccessful==true){
+      let resp={
+        LoanAccountNumber:response.data.Message.LoanAccountNumber,
+        LoanAmount:response.data.Message.LoanAmount,
+        TotalPaymentOnLoan:response.data.Message.TotalPaymentOnLoan,
+        PrincipalPaid:response.data.Message.PrincipalPaid,
+        InterestPaid:response.data.Message.InterestPaid,
+        TotalOutstandingPrincipal:response.data.Message.TotalOutstandingPrincipal,
+        PrincipalDueButUnpaid:response.data.Message.PrincipalDueButUnpaid,
+        InterestDueButUnpaid:response.data.Message.InterestDueButUnpaid,
+      }
+      res.send(JSON.stringify(response.data.Message));
+    }else{
+      let resp={
+        responseCode:"69",
+        responseCode:"No Loan schedule found for this account"
+      }
+      res.send
+    }
+
+  },(error)=>{
+    console.log(error)
+    res.status(500).send();
+  })
+  
+})
+
+
 
 //loan schedule
 app.get('/loanschedule/:loanAccountNumber',async(req,res)=>{
